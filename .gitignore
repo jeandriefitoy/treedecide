@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/.venv/
+backend/venv/
+
+# Environment
+.env
+.env.local
+backend/.env
+frontend/.env.local
+
+# Build
+frontend/.next/
+frontend/out/
+
+# Uploads
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
