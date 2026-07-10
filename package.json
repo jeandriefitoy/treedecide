@@ -1,0 +1,14 @@
+{
+  "name": "treedecide",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev:frontend": "npm --prefix frontend-new run dev",
+    "dev:backend": "cd backend && uvicorn app.main:app --reload --port 8000",
+
+    "install:frontend": "npm --prefix frontend-new install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
