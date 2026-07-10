@@ -1,5 +1,9 @@
 "use client";
 
+import { 
+    // useEffect, 
+    useState 
+} from "react";
 import {
     Table,
     TableBody,
@@ -16,131 +20,71 @@ import {
     PaginationNext,
     PaginationPrevious,
 } from "@/components/ui/pagination";
-import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
-
-export interface WeatherDataset {
-    outlook: "Sunny" | "Overcast" | "Rain";
-    temperature: "Hot" | "Mild" | "Cool";
-    humidity: "High" | "Normal";
-    wind: "Weak" | "Strong";
-    play: "Yes" | "No";
-}
-
-const dataset: WeatherDataset[] = [
-    {
-        outlook: "Sunny",
-        temperature: "Hot",
-        humidity: "High",
-        wind: "Weak",
-        play: "No",
-    },
-    {
-        outlook: "Sunny",
-        temperature: "Hot",
-        humidity: "High",
-        wind: "Strong",
-        play: "No",
-    },
-    {
-        outlook: "Overcast",
-        temperature: "Hot",
-        humidity: "High",
-        wind: "Weak",
-        play: "Yes",
-    },
-    {
-        outlook: "Rain",
-        temperature: "Mild",
-        humidity: "High",
-        wind: "Weak",
-        play: "Yes",
-    },
-    {
-        outlook: "Rain",
-        temperature: "Cool",
-        humidity: "Normal",
-        wind: "Weak",
-        play: "Yes",
-    },
-    {
-        outlook: "Rain",
-        temperature: "Cool",
-        humidity: "Normal",
-        wind: "Weak",
-        play: "Yes",
-    },
-    {
-        outlook: "Rain",
-        temperature: "Cool",
-        humidity: "Normal",
-        wind: "Weak",
-        play: "Yes",
-    },
-];
+import { useTreeStore } from "@/store/useTreeStore";
 
 export default function DatasetPreview() {
+    const { dataset } = useTreeStore();
     const [page, setPage] = useState(1);
 
+    const previewData = dataset?.preview || [];
+    const columns = dataset?.columns || [];
     const pageSize = 5;
+    const totalPages = Math.max(1, Math.ceil(previewData.length / pageSize));
 
-    const totalPages = Math.ceil(dataset.length / pageSize);
-
-    const paginatedData = dataset.slice(
+    const paginatedData = previewData.slice(
         (page - 1) * pageSize,
         page * pageSize
     );
+
+    // useEffect(() => {
+    //     setPage(1);
+    // }, [dataset?.session_id]);
+
+    if (!dataset) return null;
+
     return (
-        <div className="flex w-full flex-col gap-4">
+        <div className="flex w-full max-w-5xl flex-col gap-4">
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-lg font-semibold">Dataset Preview</h2>
-
                     <p className="text-sm text-muted-foreground">
-                        Showing first 5 rows of your dataset
+                        Showing sample rows of your dataset
                     </p>
                 </div>
-
-                {/* <p className="text-sm text-muted-foreground">
-                    {dataset.length}/{dataset.length} rows
-                </p> */}
             </div>
 
             <div className="overflow-hidden rounded-lg border shadow-md">
-                <Table className="">
+                <Table>
                     <TableHeader className="bg-gray-200">
                         <TableRow>
-                            <TableHead className="py-3">Outlook</TableHead>
-                            <TableHead className="py-3">Temperature</TableHead>
-                            <TableHead className="py-3">Humidity</TableHead>
-                            <TableHead className="py-3">Wind</TableHead>
-                            <TableHead className="py-3">Play</TableHead>
+                            {columns.map((col, index) => (
+                                <TableHead key={index} className="py-3 font-semibold text-gray-700">
+                                    {col.name}
+                                </TableHead>
+                            ))}
                         </TableRow>
                     </TableHeader>
 
                     <TableBody>
-                        {paginatedData.map((row, index) => (
+                        {paginatedData.map((row, rowIndex) => (
                             <TableRow
-                                key={index}
-                                className={index % 2 === 1 ? "bg-gray-100" : ""}
+                                key={rowIndex}
+                                className={rowIndex % 2 === 1 ? "bg-gray-100" : ""}
                             >
-                                <TableCell className="py-3">{row.outlook}</TableCell>
-                                <TableCell className="py-3">{row.temperature}</TableCell>
-                                <TableCell className="py-3">{row.humidity}</TableCell>
-                                <TableCell className="py-3">{row.wind}</TableCell>
-                                <TableCell>
-                                    <Badge variant={row.play === "Yes" ? "default" : "destructive"}>
-                                        {row.play}
-                                    </Badge>
-                                </TableCell>
+                                {columns.map((col, colIndex) => (
+                                    <TableCell key={colIndex} className="py-3">
+                                        {String(row[col.name] ?? "-")}
+                                    </TableCell>
+                                ))}
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
-                <div className="flex items-center justify-between px-2 py-6">
+                
+                <div className="flex items-center justify-between px-4 py-4">
                     <p className="text-sm text-muted-foreground">
-                        Showing {(page - 1) * pageSize + 1}–
-                        {Math.min(page * pageSize, dataset.length)} of {dataset.length} rows
+                        Showing {previewData.length > 0 ? (page - 1) * pageSize + 1 : 0}–
+                        {Math.min(page * pageSize, previewData.length)} of {previewData.length} preview rows
                     </p>
 
                     <Pagination className="w-auto m-0">
@@ -152,11 +96,7 @@ export default function DatasetPreview() {
                                         e.preventDefault();
                                         if (page > 1) setPage(page - 1);
                                     }}
-                                    className={
-                                        page === 1
-                                            ? "pointer-events-none opacity-50"
-                                            : ""
-                                    }
+                                    className={page === 1 ? "pointer-events-none opacity-50" : ""}
                                 />
                             </PaginationItem>
 
@@ -182,11 +122,7 @@ export default function DatasetPreview() {
                                         e.preventDefault();
                                         if (page < totalPages) setPage(page + 1);
                                     }}
-                                    className={
-                                        page === totalPages
-                                            ? "pointer-events-none opacity-50"
-                                            : ""
-                                    }
+                                    className={page === totalPages ? "pointer-events-none opacity-50" : ""}
                                 />
                             </PaginationItem>
                         </PaginationContent>

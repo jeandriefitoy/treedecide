@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import StepProgress from "./components/StepProgress";
 import UploadSection from "./components/upload/UploadSection";
 import ConfigureSection from "./components/configuration/ConfigureSection";
-// import AnalysisSection from "./components/analysis/AnalysisSection";
+import AnalysisSection from "./components/analysis/AnalysisSection";
 
 export default function Workspace() {
     const [currentStep, setCurrentStep] = useState(1);
@@ -15,7 +15,7 @@ export default function Workspace() {
     if (currentStep === 3) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
-                {/* <AnalysisSection onBack={() => setCurrentStep(2)} /> */}
+                <AnalysisSection />
             </div>
         );
     }
@@ -51,7 +51,7 @@ export default function Workspace() {
 
                 {currentStep === 2 && (
                     <ConfigureSection
-                        // onBack={() => setCurrentStep(1)}
+                        onBack={() => setCurrentStep(1)}
                         onNext={() => setCurrentStep(3)}
                     />
                 )}

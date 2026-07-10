@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Brain } from 'lucide-react'
+// import { Brain } from 'lucide-react'
 
 interface AlgorithmCardProps {
   algorithm: string

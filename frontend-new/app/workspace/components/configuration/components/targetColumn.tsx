@@ -1,74 +1,100 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+"use client";
+
+import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent } from "@/components/ui/select";
-import { SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2Icon, CircleAlert, Dot, Play, SendHorizonal } from "lucide-react";
-
-
-const items = [
-    { label: "Select a fruit", value: null },
-    { label: "Outlook", value: "apple" },
-    { label: "Temperature", value: "banana" },
-    { label: "Humidity", value: "blueberry" },
-    { label: "Wind", value: "grapes" },
-    { label: "PlayTennis", value: "pineapple" },
-]
+import {
+    Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { CircleAlert, Play, Loader2 } from "lucide-react";
+import { useTreeStore } from "@/store/useTreeStore";
+import { TreeService } from "@/services/treeService";
 
 interface TargetColumnProps {
-  onNext: () => void;
-//   onBack: () => void;
+    onBack?: () => void;
+    onNext: () => void;
 }
 
-export default function TargetColumn({
-  onNext,
-//   onBack,
-}: TargetColumnProps) {
+export default function TargetColumn({ onNext }: TargetColumnProps) {
+    const { dataset, setTargetColumn } = useTreeStore();
+    const [target, setTarget] = useState<string>("");
+    const [isLoading, setIsLoading] = useState(false);
+
+    if (!dataset) return null;
+
+    const selectedColumn = dataset.columns.find((col) => col.name === target);
+
+    const handleAnalyze = async () => {
+        if (!target || !dataset.session_id) return;
+
+        setIsLoading(true);
+        try {
+            await TreeService.selectTarget(dataset.session_id, target);
+            setTargetColumn(target);
+            onNext();
+        } catch (error) {
+            console.error("Gagal memilih target:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     return (
-        <div className="flex flex-col gap-3 w-xl">
-            <Card className="p-6 flex flex-col">
-                <div className="flex flex-row gap-0 items-center">
-                    <div className="flex flex-col items-start gap-1">
-                        <h1 className="text-sm font-semibold">
-                            Target Column
-                        </h1>
-                        <p className="text-gray-500">
-                            Select the column you want the model to predict.
-                        </p>
-                    </div>
+        <div className="flex flex-col gap-3 w-full max-w-sm">
+            <Card className="p-6 flex flex-col gap-4 shadow-md">
+                <div className="flex flex-col items-start gap-1">
+                    <h1 className="text-sm font-semibold">Target Column</h1>
+                    <p className="text-gray-500 text-sm">Select the column you want the model to predict.</p>
                 </div>
 
-                <Select items={items}>
-                    <SelectTrigger className="w-full py-5 shadow-md">
-                        <SelectValue />
+                <Select
+                    value={target}
+                    onValueChange={(value) => setTarget(value ?? "")}
+                >
+                    <SelectTrigger className="w-full py-5 shadow-sm">
+                        <SelectValue placeholder="Select a column..." />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectGroup>
-                            <SelectLabel>Fruits</SelectLabel>
-                            {items.map((item) => (
-                                <SelectItem key={item.value} value={item.value}>
-                                    {item.label}
+                            <SelectLabel>Dataset Columns</SelectLabel>
+                            {dataset.columns.map((col) => (
+                                <SelectItem key={col.name} value={col.name}>
+                                    {col.name}
                                 </SelectItem>
                             ))}
                         </SelectGroup>
                     </SelectContent>
                 </Select>
 
-                <Alert className="w-full text-green-500">
-                    <CircleAlert />
-                    {/* <AlertTitle>Account updated successfully</AlertTitle> */}
-                    <AlertDescription className="text-green-500">
-                        This column is categorical with 2 unique values: Yes, No.
-                    </AlertDescription>
-                </Alert>
+                {selectedColumn && (
+                    <Alert className="w-full border-green-200 bg-green-50 text-green-800">
+                        <CircleAlert className="h-4 w-4 text-green-600" />
+                        <AlertDescription className="text-green-700">
+                            This column is <strong>{selectedColumn.type}</strong> with{" "}
+                            <strong>{selectedColumn.unique_values || 0}</strong> unique values.
+                        </AlertDescription>
+                    </Alert>
+                )}
             </Card>
 
-            <Button variant="default" size={"lg"} className="w-full py-5 rounded-xl gap-4 cursor-pointer" onClick={onNext}>
-                <Play />
-                Analyze Dataset
+            <Button
+                variant="default"
+                size="lg"
+                className="w-full py-6 rounded-xl gap-4 cursor-pointer text-md"
+                onClick={handleAnalyze}
+                disabled={!target || isLoading}
+            >
+                {isLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                    <Play fill="currentColor" className="h-5 w-5" />
+                )}
+                {isLoading ? "Preparing..." : "Analyze Dataset"}
             </Button>
-
-            <p className="text-gray-500 text-xs">Algorithm will be selected automatically based on your data.</p>
+            <p className="text-gray-500 text-xs text-center mt-1">
+                Algorithm will be selected automatically based on your data.
+            </p>
         </div>
-    )
+    );
 }

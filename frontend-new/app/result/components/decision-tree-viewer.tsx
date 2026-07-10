@@ -1,56 +1,178 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { ZoomIn, ZoomOut, RotateCcw, Maximize2, Trees } from 'lucide-react'
+import { Maximize2, Trees } from 'lucide-react'
 import EmptyDecisionTreeState from './empty-decision-tree-state'
+import {
+  ReactFlow,
+  Controls,
+  Background,
+  useNodesState,
+  useEdgesState,
+  Handle,
+  Position,
+  BackgroundVariant,
+} from '@xyflow/react'
+import type { Node, Edge } from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import dagre from 'dagre'
+
+interface TreeNodeData {
+  name?: string
+  is_leaf?: boolean
+  class_label?: string
+  children?: TreeNodeData[]
+}
 
 interface DecisionTreeViewerProps {
   title?: string
   showMessage?: boolean
   onExport?: () => void
   onUploadClick?: () => void
+  treeData?: TreeNodeData
   hasTree?: boolean
-  minZoom?: number
-  maxZoom?: number
-  initialZoom?: number
-  children?: React.ReactNode
 }
+
+interface CustomNodeData {
+  label: string
+  isLeaf: boolean
+  classLabel: string
+}
+
+const CustomTreeNode = ({ data }: { data: Record<string, unknown> }) => {
+  const { label, isLeaf, classLabel } = data as unknown as CustomNodeData;
+
+  return (
+    <>
+      <Handle type="target" position={Position.Top} className="opacity-0" />
+      <div
+        className={`flex flex-col items-center justify-center w-[180px] h-[85px] p-3 border rounded-xl shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-1 ${
+          isLeaf 
+            ? 'bg-gradient-to-b from-emerald-50 to-emerald-100/60 border-emerald-300' 
+            : 'bg-gradient-to-b from-white to-slate-50 border-slate-200'
+        }`}
+      >
+        <span className={`text-sm font-bold text-center break-words ${isLeaf ? 'text-emerald-800' : 'text-slate-700'}`}>
+          {label}
+        </span>
+        {isLeaf && (
+          <span className="mt-2 text-[10px] font-bold tracking-widest text-emerald-700 uppercase bg-emerald-200/70 px-3 py-1 rounded-full">
+            {classLabel}
+          </span>
+        )}
+      </div>
+      <Handle type="source" position={Position.Bottom} className="opacity-0" />
+    </>
+  );
+};
+
+const nodeTypes = { customNode: CustomTreeNode };
+
+
+const dagreGraph = new dagre.graphlib.Graph();
+dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+const getLayoutedElements = (nodes: Node[], edges: Edge[], direction = 'TB') => {
+  dagreGraph.setGraph({ rankdir: direction, nodesep: 60, ranksep: 100 });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: 180, height: 85 });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const newNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    return {
+      ...node,
+      position: {
+        x: nodeWithPosition.x - 180 / 2,
+        y: nodeWithPosition.y - 85 / 2,
+      },
+    };
+  });
+
+  return { nodes: newNodes, edges };
+};
 
 export default function DecisionTreeViewer({
   title = 'Decision Tree',
-  showMessage = true,
-  onExport,
   onUploadClick,
+  treeData,
   hasTree = true,
-  minZoom = 50,
-  maxZoom = 200,
-  initialZoom = 100,
-  children,
 }: DecisionTreeViewerProps) {
-  const [zoomLevel, setZoomLevel] = useState(initialZoom)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
-  const handleZoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev + 10, maxZoom))
-  }
+  const processTreeData = useCallback((rootNode: TreeNodeData) => {
+    const initialNodes: Node[] = [];
+    const initialEdges: Edge[] = [];
+    let idCounter = 0;
 
-  const handleZoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev - 10, minZoom))
-  }
+    const traverse = (node: TreeNodeData, parentId: string | null = null) => {
+      if (!node) return;
 
-  const handleResetView = () => {
-    setZoomLevel(initialZoom)
-  }
+      const currentId = `node-${idCounter++}`;
+      const nameParts = node.name ? node.name.split(' ➔ ') : ['Unknown'];
+      const condition = nameParts.length > 1 ? nameParts[0] : '';
+      const nodeLabel = nameParts.length > 1 ? nameParts[1] : nameParts[0];
+
+      initialNodes.push({
+        id: currentId,
+        type: 'customNode',
+        data: {
+          label: nodeLabel,
+          isLeaf: node.is_leaf || false,
+          classLabel: node.class_label || '',
+        },
+        position: { x: 0, y: 0 },
+      });
+
+      if (parentId) {
+        initialEdges.push({
+          id: `edge-${parentId}-${currentId}`,
+          source: parentId,
+          target: currentId,
+          label: condition,
+          type: 'smoothstep',
+          animated: true,
+          style: { stroke: '#cbd5e1', strokeWidth: 2 },
+          labelStyle: { fill: '#475569', fontWeight: 600, fontSize: 12 },
+          labelBgStyle: { fill: '#ffffff', stroke: '#e2e8f0', strokeWidth: 1, rx: 6, ry: 6 },
+          labelBgPadding: [8, 4],
+        });
+      }
+
+      if (node.children && node.children.length > 0) {
+        node.children.forEach((child) => traverse(child, currentId));
+      }
+    };
+
+    traverse(rootNode);
+
+    const layouted = getLayoutedElements(initialNodes, initialEdges);
+    setNodes(layouted.nodes);
+    setEdges(layouted.edges);
+  }, [setNodes, setEdges]);
+
+  useEffect(() => {
+    if (treeData) {
+      processTreeData(treeData);
+    }
+  }, [treeData, processTreeData]);
 
   const handleFullscreen = () => {
     const element = document.getElementById('decision-tree-container')
     if (element) {
       if (!isFullscreen) {
-        element.requestFullscreen().catch(() => {
-          setIsFullscreen(true)
-        })
+        element.requestFullscreen().catch(() => setIsFullscreen(true))
       } else {
         document.exitFullscreen()
       }
@@ -59,142 +181,54 @@ export default function DecisionTreeViewer({
   }
 
   const cardClasses = isFullscreen
-    ? 'fixed inset-0 z-50 rounded-none'
+    ? 'fixed inset-0 z-50 rounded-none bg-background'
     : 'border border-border bg-card rounded-2xl overflow-hidden'
+
+  const shouldRenderTree = hasTree && treeData;
 
   return (
     <Card id="decision-tree-container" className={cardClasses}>
-      <CardHeader className="border-b border-border px-6 py-4 sticky top-0 bg-card z-10">
+      <CardHeader className="border-b border-border px-6 py-4 sticky top-0 bg-card z-10 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
-              <Trees className="w-8 h-8" />
+              <Trees className="w-5 h-5 text-accent" />
             </div>
             <CardTitle className="text-2xl font-bold">{title}</CardTitle>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-sm font-medium text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
-              {zoomLevel}%
-            </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleFullscreen} className="gap-2">
+              <Maximize2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Fullscreen</span>
+            </Button>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="p-6">
-        {hasTree && (
-        <div className="flex flex-wrap gap-2 mb-6 pb-4 border-b border-border">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleZoomIn}
-              disabled={zoomLevel >= maxZoom}
-              className="gap-2"
-              title="Zoom in (keyboard: +)"
-            >
-              <ZoomIn className="w-4 h-4" />
-              <span className="hidden sm:inline">Zoom In</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleZoomOut}
-              disabled={zoomLevel <= minZoom}
-              className="gap-2"
-              title="Zoom out (keyboard: -)"
-            >
-              <ZoomOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Zoom Out</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleResetView}
-              className="gap-2"
-              title="Reset to default zoom"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span className="hidden sm:inline">Reset</span>
-            </Button>
-          </div>
-
-          <div className="flex gap-2 ml-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleFullscreen}
-              className="gap-2"
-              title="Toggle fullscreen"
-            >
-              <Maximize2 className="w-4 h-4" />
-              <span className="hidden sm:inline">Fullscreen</span>
-            </Button>
-            {onExport && (
-              <Button
-                onClick={onExport}
-                size="sm"
-                className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
-                title="Export tree as image"
-              >
-                Download
-              </Button>
-            )}
-          </div>
-        </div>
-        )}
-
-        {hasTree ? (
-          <div
-            className="w-full transition-all duration-200"
-            style={{
-              transform: `scale(${zoomLevel / 100})`,
-              transformOrigin: 'top center',
-              minHeight: isFullscreen ? 'calc(100vh - 180px)' : '500px',
-            }}
+      <CardContent className="p-0">
+        {shouldRenderTree ? (
+          <div 
+            className="w-full relative" 
+            style={{ height: isFullscreen ? 'calc(100vh - 80px)' : '600px' }}
           >
-            {children ? (
-              children
-            ) : (
-              <div className="w-full bg-gradient-to-br from-accent/5 via-transparent to-accent/5 rounded-xl border border-dashed border-accent/30 flex items-center justify-center" style={{ minHeight: '500px' }}>
-                <div className="text-center max-w-md">
-                  <div className="w-20 h-20 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
-                    <svg
-                      className="w-10 h-10 text-accent"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                      />
-                    </svg>
-                  </div>
-                  {showMessage && (
-                    <>
-                      <h3 className="text-lg font-semibold text-foreground mb-2">
-                        Decision Tree Visualization
-                      </h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        The generated Decision Tree will appear here after the analysis is complete.
-                      </p>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              nodeTypes={nodeTypes}
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.1}
+            >
+              <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
+              <Controls className="bg-white shadow-md border-slate-200 rounded-lg" />
+            </ReactFlow>
           </div>
         ) : (
-          <EmptyDecisionTreeState onUploadClick={onUploadClick} />
-        )}
-
-        {hasTree && (
-        <div className="mt-6 pt-4 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-          <span>Zoom range: {minZoom}% - {maxZoom}%</span>
-          <span>Current zoom: {zoomLevel}%</span>
-        </div>
+          <div className="p-6">
+            <EmptyDecisionTreeState onUploadClick={onUploadClick} />
+          </div>
         )}
       </CardContent>
     </Card>
