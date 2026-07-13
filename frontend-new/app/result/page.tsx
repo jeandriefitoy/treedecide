@@ -30,7 +30,7 @@ function parseRuleString(ruleStr: string, index: number) {
 export default function ResultsPage() {
     const router = useRouter()
     const { dataset, treeResult, setTreeResult, clearDataset } = useTreeStore()
-    const [isLoading, setIsLoading] = useState(true)
+    const isLoading = !treeResult;
 
     useEffect(() => {
         if (!dataset?.session_id) {
@@ -39,31 +39,24 @@ export default function ResultsPage() {
     }, [dataset?.session_id, router]);
 
     useEffect(() => {
-        if (treeResult) {
-            setIsLoading(false);
-            return;
-        }
-
         if (!dataset?.session_id) {
             router.push("/workspace");
             return;
         }
 
-        const fetchTreeResult = async () => {
-            setIsLoading(true);
+        if (treeResult) return;
 
+        const fetchTreeResult = async () => {
             try {
                 const data = await TreeService.getResult(dataset.session_id);
                 setTreeResult(data);
             } catch (err) {
                 console.error(err);
-            } finally {
-                setIsLoading(false);
             }
         };
 
         fetchTreeResult();
-    }, [dataset?.session_id, treeResult]);
+    }, [dataset?.session_id, treeResult, router, setTreeResult]);
 
     if (isLoading) {
         return (
