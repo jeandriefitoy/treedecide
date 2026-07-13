@@ -48,3 +48,8 @@ API Docs: http://localhost:8000/docs
 1. Upload file di `/`
 2. Konfigurasi kolom target di `/configure`
 3. Lihat hasil pohon keputusan di `/result`
+
+## jalanin langsung 2 aplikasi di root
+```bash
+npm run dev
+```

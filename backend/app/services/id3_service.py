@@ -42,7 +42,15 @@ def calculate_information_gain(df: pd.DataFrame, attribute: str, target_column_n
     # 3. Information Gain = Total Entropy - Weighted Entropy
     return total_entropy - weighted_entropy
 
-def build_id3_tree(df: pd.DataFrame, target_column_name: str, attributes: List[str]) -> Union[str, Dict]:
+def build_id3_tree(
+    df: pd.DataFrame,
+    target_column_name: str,
+    attributes: List[str],
+    depth: int = 0,
+    max_depth: int = 8,
+    min_samples_split: int = 5,
+    min_gain: float = 0.01,
+) -> Union[str, Dict]:
     """
     Membangun pohon keputusan ID3 secara rekursif.
     """
@@ -54,6 +62,14 @@ def build_id3_tree(df: pd.DataFrame, target_column_name: str, attributes: List[s
     # kembalikan label target yang paling sering muncul (majority class)
     if not attributes:
         return df[target_column_name].mode()[0]
+    
+    # Base Case 3: Batasi kedalaman pohon
+    if depth >= max_depth:
+        return df[target_column_name].mode()[0]
+    
+    # jumlah data terlalu sedikit
+    if len(df) < min_samples_split:
+        return df[target_column_name].mode()[0]
         
     # Recursive Step: Cari atribut dengan Information Gain tertinggi
     gains = {}
@@ -62,6 +78,11 @@ def build_id3_tree(df: pd.DataFrame, target_column_name: str, attributes: List[s
         
     # Ambil nama atribut dengan nilai gain maksimal
     best_attr = max(gains, key=gains.get)
+    
+    best_gain = gains[best_attr]
+
+    if best_gain < min_gain:
+        return df[target_column_name].mode()[0]
     
     # Inisialisasi node root untuk subtree ini
     tree = {best_attr: {}}
@@ -77,8 +98,15 @@ def build_id3_tree(df: pd.DataFrame, target_column_name: str, attributes: List[s
             # Jika subset kosong (jarang terjadi di pandas, tapi sbg pengaman), kembalikan majority class
             tree[best_attr][value] = df[target_column_name].mode()[0]
         else:
-            # Panggil fungsi secara rekursif untuk subset
-            tree[best_attr][value] = build_id3_tree(subset, target_column_name, remaining_attributes)
+            tree[best_attr][value] = build_id3_tree(
+                subset,
+                target_column_name,
+                remaining_attributes,
+                depth + 1,
+                max_depth,
+                min_samples_split,
+                min_gain,
+            )
             
     return tree
 
@@ -118,7 +146,14 @@ def run_id3_training(df: pd.DataFrame, target_column: str) -> Dict[str, Any]:
     feature_columns = [col for col in df.columns if col != target_column]
     
     # 1. Bangun pohon keputusan
-    tree = build_id3_tree(df, target_column, feature_columns)
+    tree = build_id3_tree(
+        df,
+        target_column,
+        feature_columns,
+        max_depth=8,
+        min_samples_split=5,
+        min_gain=0.01,
+    )
     
     rules = extract_rules(tree)
     

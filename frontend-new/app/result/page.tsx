@@ -39,7 +39,15 @@ export default function ResultsPage() {
     }, [dataset?.session_id, router]);
 
     useEffect(() => {
-        if (!dataset?.session_id || treeResult) return;
+        if (treeResult) {
+            setIsLoading(false);
+            return;
+        }
+
+        if (!dataset?.session_id) {
+            router.push("/workspace");
+            return;
+        }
 
         const fetchTreeResult = async () => {
             setIsLoading(true);
@@ -55,7 +63,7 @@ export default function ResultsPage() {
         };
 
         fetchTreeResult();
-    }, [dataset?.session_id, treeResult, setTreeResult]);
+    }, [dataset?.session_id, treeResult]);
 
     if (isLoading) {
         return (

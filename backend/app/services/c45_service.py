@@ -80,12 +80,26 @@ def evaluate_numeric_attribute(df: pd.DataFrame, attribute: str, target: str, ba
             
     return best_gain_ratio, best_threshold
 
-def build_c45_tree(df: pd.DataFrame, target: str, attributes: List[str], columns_info: List[Dict]) -> Union[str, Dict]:
+def build_c45_tree(
+    df: pd.DataFrame,
+    target: str,
+    attributes: List[str],
+    columns_info: List[Dict],
+    depth: int = 0,
+    max_depth: int = 8,
+    min_samples_split: int = 5,
+    min_gain_ratio: float = 0.001,
+) -> Union[str, Dict]:
     # Base cases
     if len(df[target].unique()) == 1:
         return df[target].iloc[0]
     if not attributes:
         return df[target].mode()[0]
+    if depth >= max_depth:
+        return df[target].mode()[0]
+    if len(df) < min_samples_split:
+        return df[target].mode()[0]
+    
         
     base_entropy = calculate_entropy(df[target])
     best_attr = None
@@ -97,6 +111,7 @@ def build_c45_tree(df: pd.DataFrame, target: str, attributes: List[str], columns
         # Cek tipe atribut dari columns_info
         attr_info = next((item for item in columns_info if item["name"] == attr), None)
         is_numeric = attr_info["type"] == "numeric" if attr_info else False
+        
         
         if is_numeric:
             gain_ratio, threshold = evaluate_numeric_attribute(df, attr, target, base_entropy)
@@ -110,10 +125,20 @@ def build_c45_tree(df: pd.DataFrame, target: str, attributes: List[str], columns
             
     if best_attr is None:
         return df[target].mode()[0]
+    
+    if best_gain_ratio < min_gain_ratio:
+        return df[target].mode()[0]
         
     tree = {best_attr: {}}
     attr_info = next((item for item in columns_info if item["name"] == best_attr), None)
     is_numeric = attr_info["type"] == "numeric" if attr_info else False
+    remaining_attrs = [
+        a for a in attributes
+        if a != best_attr
+    ]
+    
+    if is_numeric and best_threshold is None:
+        return df[target].mode()[0]
     
     # Proses Splitting berdasarkan tipe
     if is_numeric:
@@ -124,15 +149,63 @@ def build_c45_tree(df: pd.DataFrame, target: str, attributes: List[str], columns
         label_leq = f"<= {best_threshold:.2f}"
         label_gt = f"> {best_threshold:.2f}"
         
-        tree[best_attr][label_leq] = build_c45_tree(subset_leq, target, attributes, columns_info) if not subset_leq.empty else df[target].mode()[0]
-        tree[best_attr][label_gt] = build_c45_tree(subset_gt, target, attributes, columns_info) if not subset_gt.empty else df[target].mode()[0]
+        if is_numeric:
+            subset_leq = df[df[best_attr] <= best_threshold]
+            subset_gt = df[df[best_attr] > best_threshold]
+
+            label_leq = f"<= {best_threshold:.2f}"
+            label_gt = f"> {best_threshold:.2f}"
+
+            tree[best_attr][label_leq] = (
+                build_c45_tree(
+                    subset_leq,
+                    target,
+                    remaining_attrs,
+                    columns_info,
+                    depth + 1,
+                    max_depth,
+                    min_samples_split,
+                    min_gain_ratio,
+                )
+                if not subset_leq.empty
+                else df[target].mode()[0]
+            )
+
+            tree[best_attr][label_gt] = (
+                build_c45_tree(
+                    subset_gt,
+                    target,
+                    remaining_attrs,
+                    columns_info,
+                    depth + 1,
+                    max_depth,
+                    min_samples_split,
+                    min_gain_ratio,
+                )
+                if not subset_gt.empty
+                else df[target].mode()[0]
+            )
     else:
         # Categorical Split (Multi-way)
         remaining_attrs = [a for a in attributes if a != best_attr]
         for value in df[best_attr].unique():
             subset = df[df[best_attr] == value]
-            tree[best_attr][value] = build_c45_tree(subset, target, remaining_attrs, columns_info) if not subset.empty else df[target].mode()[0]
-            
+
+            tree[best_attr][value] = (
+                build_c45_tree(
+                    subset,
+                    target,
+                    remaining_attrs,
+                    columns_info,
+                    depth + 1,
+                    max_depth,
+                    min_samples_split,
+                    min_gain_ratio,
+                )
+                if not subset.empty
+                else df[target].mode()[0]
+            )
+                    
     return tree
 
 def extract_c45_rules(tree: Union[str, Dict], current_rule: str = "") -> List[str]:
@@ -160,9 +233,19 @@ def run_c45_training(df: pd.DataFrame, target_column: str, columns_info: List[Di
         if df[col].isnull().any():
             mode_val = df[col].mode()[0]
             df[col] = df[col].fillna(mode_val)
-            
+
     feature_columns = [col for col in df.columns if col != target_column]
-    tree = build_c45_tree(df, target_column, feature_columns, columns_info)
+
+    tree = build_c45_tree(
+        df,
+        target_column,
+        feature_columns,
+        columns_info,
+        max_depth=8,
+        min_samples_split=5,
+        min_gain_ratio=0.01,
+    )
+
     rules = extract_c45_rules(tree)
     
     return {
