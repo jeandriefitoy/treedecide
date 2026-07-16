@@ -48,11 +48,10 @@ const CustomTreeNode = ({ data }: { data: Record<string, unknown> }) => {
     <>
       <Handle type="target" position={Position.Top} className="opacity-0" />
       <div
-        className={`flex flex-col items-center justify-center w-[180px] h-[85px] p-3 border rounded-xl shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-1 ${
-          isLeaf 
-            ? 'bg-gradient-to-b from-emerald-50 to-emerald-100/60 border-emerald-300' 
-            : 'bg-gradient-to-b from-white to-slate-50 border-slate-200'
-        }`}
+        className={`flex flex-col items-center justify-center w-[180px] h-[85px] p-3 border rounded-xl shadow-sm  transition-all duration-200 hover:shadow-md hover:-translate-y-1 ${isLeaf
+            ? 'bg-gradient-to-b from-emerald-50 to-emerald-100/60 border-emerald-300'
+            : 'bg-white border-slate-600 shadow-lg hover:shadow-xl'
+          }`}
       >
         <span className={`text-sm font-bold text-center break-words ${isLeaf ? 'text-emerald-800' : 'text-slate-700'}`}>
           {label}
@@ -143,7 +142,7 @@ export default function DecisionTreeViewer({
           label: condition,
           type: 'smoothstep',
           animated: true,
-          style: { stroke: '#cbd5e1', strokeWidth: 2 },
+          style: { stroke: '#0073ff', strokeWidth: 2 },
           labelStyle: { fill: '#475569', fontWeight: 600, fontSize: 12 },
           labelBgStyle: { fill: '#ffffff', stroke: '#e2e8f0', strokeWidth: 1, rx: 6, ry: 6 },
           labelBgPadding: [8, 4],
@@ -207,8 +206,8 @@ export default function DecisionTreeViewer({
 
       <CardContent className="p-0">
         {shouldRenderTree ? (
-          <div 
-            className="w-full relative" 
+          <div
+            className="w-full relative"
             style={{ height: isFullscreen ? 'calc(100vh - 80px)' : '600px' }}
           >
             <ReactFlow
@@ -220,9 +219,12 @@ export default function DecisionTreeViewer({
               fitView
               fitViewOptions={{ padding: 0.2 }}
               minZoom={0.1}
+              style={{
+                background: '#ffffff',
+              }}
             >
-              <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
-              <Controls className="bg-white shadow-md border-slate-200 rounded-lg" />
+              <Background variant={BackgroundVariant.Dots} gap={12} size={1} color="#e2e8f0" />
+              <Controls className="bg-gray-600 shadow-md border-slate-200 rounded-lg" />
             </ReactFlow>
           </div>
         ) : (

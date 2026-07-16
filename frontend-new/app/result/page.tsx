@@ -87,8 +87,8 @@ export default function ResultsPage() {
     }
 
     return (
-        <main className="min-h-screen p-8">
-            <div className="max-w-7xl mx-auto space-y-8">
+        <main className="min-h-screen">
+            <div className=" mx-auto space-y-8">
                 <div>
                     <h1 className="text-4xl font-bold text-foreground mb-2">Analysis Results</h1>
                     <p className="text-muted-foreground">
